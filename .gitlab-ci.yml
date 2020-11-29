@@ -1,0 +1,67 @@
+stages:
+  - testing # Запуск тестов
+  - history_copy # Копирование результата тестов из предыдущего запуска тестов
+  - reports # Генерация отчета
+  - deploy # Публикация отчета на gitlab pages
+
+docker_job:
+  stage: testing
+  tags:
+    - docker
+  image: python:3.8-alpine
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - pytest -n=4 --alluredir=./allure-results tests/
+
+  allow_failure: true
+  artifacts:
+    when: always
+    paths:
+      - ./allure-results
+    expire_in: 1 day
+
+history_job:
+  stage: history_copy
+  tags:
+    - docker
+  image: storytel/alpine-bash-curl
+  script:
+    - 'curl --location --output artifacts.zip "https://gitlab.com/api/v4/projects/20887326/jobs/artifacts/master/download?job=pages&job_token=$CI_JOB_TOKEN"'
+    - apk add unzip
+    - unzip artifacts.zip
+    - chmod -R 777 public
+    - cp -r ./public/history ./allure-results
+  allow_failure: true
+  artifacts: 
+    paths:
+      - ./allure-results
+    expire_in: 1 day
+  rules:
+    - when: always
+
+allure_job:
+  stage: reports
+  tags:
+    - docker
+  image: frankescobar/allure-docker-service
+  script:
+     - allure generate -c ./allure-results -o ./allure-report
+  artifacts:
+    paths:
+      - ./allure-results
+      - ./allure-report
+    expire_in: 1 day
+  rules:
+    - when: always
+
+pages:
+  stage: deploy
+  script:
+    - mkdir public
+    - mv ./allure-report/* public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - when: always
