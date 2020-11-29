@@ -4,6 +4,8 @@ node('jenkins-slave') {
             rm -rf pytests/
             git clone https://github.com/fhause5/pytests.git
             cd pytests
+            mkdir allure-results/
+            mkdir allure-report/
         '''.stripIndent()
     }
     stage('Run Pytest') {
